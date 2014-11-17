@@ -1,26 +1,30 @@
+//SYSTEM_MODE(MANUAL);
+
 #include "Spacebrew.h"
 
 Spacebrew sb;
 
 // name + descriptor for Spacebrew
-#define APP_NAME  "SparkCore"
+#define APP_NAME  "NormalNinja"
 #define APP_DESC  "Trying out Spark Cores with Spacebrew!"
 #define BTNPIN    D3
 #define LEDPIN    D1
+#define STPIN     D0
 #define APIN      A0
 
 int lastBtnState = 0;
 int lastAnalog = -1;
 
 void setup() {
-  Serial.begin(38400);
+  //Serial.begin(38400);
   delay(2000);
-  Serial.println("Send any char to start");
-  while(!Serial.available())
-    Spark.process();
+  //Serial.println("Send any char to start");
+  //while(!Serial.available())
+  //  Spark.process();
 
   pinMode(BTNPIN,INPUT_PULLUP);
   pinMode(LEDPIN,OUTPUT);
+  pinMode(STPIN,OUTPUT);
 
   //connect to spacebrew library info
   sb.onOpen(onOpen);
@@ -36,7 +40,7 @@ void setup() {
   sb.addSubscribe("LED", SB_BOOLEAN);
 
   //connect to the spacebrew server
-  sb.connect("your.spacebrewserver.com", APP_NAME, APP_DESC);
+  sb.connect("spacebrew.chuank.com", APP_NAME, APP_DESC);
 }
 
 void loop() {
@@ -64,14 +68,16 @@ void onBooleanMessage(char *name, bool value) {
 }
 
 void onOpen(){
-  Serial.println("### SpaceBrew: connected");
+  //Serial.println("### SpaceBrew: connected");
+  digitalWrite(STPIN,HIGH);
 }
 
 void onClose(int code, char* message){
-  Serial.print("### SpaceBrew: closed");
+  //Serial.print("### SpaceBrew: closed");
+  digitalWrite(STPIN,LOW);
 }
 
 void onError(char* message) {
-  Serial.print("!!! ERROR: ");
-  Serial.println(message);
+  //Serial.print("!!! ERROR: ");
+  //Serial.println(message);
 }

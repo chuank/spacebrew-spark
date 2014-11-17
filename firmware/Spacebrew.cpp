@@ -168,12 +168,15 @@ void Spacebrew::connect(char hostname[], char* clientName, char* description, in
       }
     }
     void Spacebrew::disconnect(){
+      #ifdef DEBUG
       Serial.println("### Spacebrew: DISCONNECTED");
+      #endif
       client.disconnect();
       m_bOpen = false;
     }
     void Spacebrew::onWSMessage(WebSocketClient client, char* message){
       #ifdef DEBUG
+      Serial.print("incoming: ");
       Serial.println(message);
       #endif
       const char *i1 = "{\"message\":{\"name\":\"",
@@ -230,8 +233,6 @@ void Spacebrew::connect(char hostname[], char* clientName, char* description, in
       strcat(b, m4);
       strcat(b, value);
       strcat(b, m5);
-      // Serial.print("send: ");
-      // Serial.println(b);
       client.send(b);
     }
     bool Spacebrew::send(char* name, int value){

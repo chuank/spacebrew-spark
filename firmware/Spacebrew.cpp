@@ -176,8 +176,15 @@ void Spacebrew::connect(char hostname[], char* clientName, char* description, in
     }
     void Spacebrew::onWSMessage(WebSocketClient client, char* message){
       #ifdef DEBUG
-      Serial.print("incoming: ");
-      Serial.println(message);
+      int msglen = strlen(message);
+      if(msglen>126) {
+        Serial.print("WARNING: message buffer overflow!");
+      } else {
+        Serial.print("incoming (length:");
+        Serial.print(strlen(message));
+        Serial.print(") : ");
+        Serial.println(message);
+      }
       #endif
       const char *i1 = "{\"message\":{\"name\":\"",
                   *i2 = "\",\"type\":\"",

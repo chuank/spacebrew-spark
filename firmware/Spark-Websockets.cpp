@@ -66,9 +66,9 @@
  * IF IBM IS APPRISED OF THE POSSIBILITY OF SUCH DAMAGES.
  */
 
-// #define HANDSHAKE // uncomment to print out the sent and received handshake messages
+#define HANDSHAKE // uncomment to print out the sent and received handshake messages
 // #define TRACE // uncomment to support TRACE level debugging of wire protocol
-// #define DEBUGGING // turn on debugging
+#define DEBUGGING // turn on debugging
 
 #include "Spark-Websockets.h"
 // #include <stdlib.h>
@@ -183,7 +183,7 @@ void WebSocketClient::monitor () {
 
 	if (_client.available() > 2) {
     #ifdef DEBUGGING
-    Serial.print("+");
+    // Serial.print("+");   // we should get a regular ping from the server
     #endif
 
     byte hdr = nextByte();
@@ -243,9 +243,16 @@ void WebSocketClient::monitor () {
     if(!fin) {
       if(_packet == NULL) {
         _packet = (char*) malloc(len);
+
+        uint8_t temppack[len];
+	      _client.read(temppack, len);
         for(int i = 0; i < len; i++) {
-          _packet[i] = nextByte();
+          _packet[i] = (char)temppack[i];
         }
+        // for(int i = 0; i < len; i++) {
+        //   _packet[i] = nextByte();
+        // }
+
         _packetLength = len;
         _opCode = opCode;
       } else {
@@ -267,9 +274,14 @@ void WebSocketClient::monitor () {
 
     if(_packet == NULL) {
       _packet = (char*) malloc(len + 1);
+      uint8_t temppack[len];
+      _client.read(temppack, len);
       for(int i = 0; i < len; i++) {
-        _packet[i] = nextByte();
+        _packet[i] = (char)temppack[i];
       }
+      // for(int i = 0; i < len; i++) {
+      //   _packet[i] = nextByte();
+      // }
       _packet[len] = 0x0;
     } else {
       int copyLen = _packetLength;
@@ -299,10 +311,10 @@ void WebSocketClient::monitor () {
         #endif
         break;
 
-      case 0x01:
+      case 0x01:          // incoming message
         #ifdef DEBUGGING
-      	Serial.print("onMessage: data = ");
-      	Serial.println(_packet);
+      	// Serial.print("onMessage: data = ");
+      	// Serial.println(_packet);
         #endif
 
         if (_onMessage != NULL) {
@@ -320,17 +332,17 @@ void WebSocketClient::monitor () {
         }
         break;
 
-      case 0x09:
+      case 0x09:          // ping
         #ifdef DEBUGGING
 	      Serial.print(".");
         #endif
 
-        _client.write(0x8A);
+        _client.write(0x8A);  // reply with pong
 	      // _client.write(0x8A);//_client.write(0x09);//0x0A; - pong
         _client.write(byte(0x00));
         break;
 
-      case 0x0A:
+      case 0x0A:          // pong
         #ifdef DEBUGGING
       	Serial.print("onPong");
         #endif
@@ -471,6 +483,7 @@ bool WebSocketClient::send (char* message) {
   #ifdef TRACE
   Serial.print("message sent: ");
   Serial.print(_client.connected());  // STOPPED HERE, STILL TRUE (1) WHEN PING BREAKS!!!
+  Serial.print(" ");
   Serial.println(message);
   #endif
   return true;

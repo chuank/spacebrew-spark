@@ -1,7 +1,6 @@
 SYSTEM_MODE(MANUAL);
 
 #include "Spacebrew.h"
-
 Spacebrew sb;
 
 // name + descriptor for Spacebrew

@@ -16,8 +16,7 @@ struct SubscriberNode {
   SubscriberNode *next;
 };
 
-class Spacebrew{
-
+class Spacebrew {
   public:
     Spacebrew();
     void monitor();

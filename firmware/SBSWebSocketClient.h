@@ -1,5 +1,5 @@
 /*
-SBSparkWebSocketClient, a websocket client specfically for spacebrew and spark devices
+SBSWebSocketClient, a websocket client specfically for spacebrew and spark devices
 
 The MIT License (MIT)
 
@@ -51,8 +51,8 @@ SOFTWARE.
  THE SOFTWARE.
 */
 
-#ifndef SBSWEBSOCKETCLIENT_H
-#define SBSWEBSOCKETCLIENT_H
+#ifndef WEBSOCKETCLIENT_H
+#define WEBSOCKETCLIENT_H
 
 #define HANDSHAKE // uncomment to print out the sent and received handshake messages
 // #define TRACE // uncomment to support TRACE level debugging of wire protocol

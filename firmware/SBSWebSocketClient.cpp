@@ -1,5 +1,5 @@
 /*
-SBSparkWebSocketClient, a websocket client specfically for spacebrew and spark devices
+SBSWebSocketClient, a websocket client specfically for spacebrew and spark devices
 
 The MIT License (MIT)
 
@@ -99,9 +99,8 @@ SOFTWARE.
 #define TRACEIN   // uncomment to print incoming websocket messages
 #define DEBUG // turn on debugging
 
-#include "Spark-Websockets.h"
+#include "SBSWebSocketClient.h"
 
-//char *stringVar = "{0}";
 
 void SBSWebSocketClient::connect(const char hostname[], int port, const char protocol[], const char path[]) {
   _hostname = hostname;

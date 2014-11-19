@@ -36,9 +36,11 @@ The SpaceBrew portion is a port from the original SpaceBrew-Arduino library by L
 https://github.com/labatrockwell/spacebrew-arduino-library
 
 The WebSocketClient implementation started off from ekbduffy's Spark WebSocket...
+
 https://github.com/ekbduffy/spark_websockets
 
 ...which is itself a Spark Core derivative of the Arduino Websocket library:
+
 https://github.com/brandenhall/Arduino-Websocket
 
 Many thanks go out to ekbduffy for running through some of the tests.

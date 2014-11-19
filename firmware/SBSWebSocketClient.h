@@ -1,4 +1,31 @@
 /*
+SBSparkWebSocketClient, a websocket client specfically for spacebrew and spark devices
+
+The MIT License (MIT)
+
+Copyright (c) [2014] [Chuan Khoo]
+http://www.chuank.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+/*
  WebsocketClient, a websocket client for Arduino
  Copyright 2011 Kevin Rohling
  Copyright 2012 Ian Moore
@@ -22,28 +49,28 @@
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
- */
+*/
 
-#ifndef WEBSOCKETCLIENT_H
-#define WEBSOCKETCLIENT_H
+#ifndef SBSWEBSOCKETCLIENT_H
+#define SBSWEBSOCKETCLIENT_H
 
 #define HANDSHAKE // uncomment to print out the sent and received handshake messages
 // #define TRACE // uncomment to support TRACE level debugging of wire protocol
 #define DEBUG // turn on debugging
 
 #define RETRY_TIMEOUT 1000
+#define RECONNECT_TIMEOUT 1000    // larger delays = better chance of recovery
 
-//#include <stdlib.h>
 #include "spark_wiring_usbserial.h"
 #include "spark_wiring_tcpclient.h"
 #include "spark_wiring_string.h"
 
-class WebSocketClient {
+class SBSWebSocketClient {
 public:
-  typedef void (*OnMessage)(WebSocketClient client, char* message);
-  typedef void (*OnOpen)(WebSocketClient client);
-  typedef void (*OnClose)(WebSocketClient client, int code, char* message);
-  typedef void (*OnError)(WebSocketClient client, char* message);
+  typedef void (*OnMessage)(SBSWebSocketClient client, char* message);
+  typedef void (*OnOpen)(SBSWebSocketClient client);
+  typedef void (*OnClose)(SBSWebSocketClient client, int code, char* message);
+  typedef void (*OnError)(SBSWebSocketClient client, char* message);
   void connect(const char hostname[], int port = 80, const char protocol[] = NULL, const char path[] = "/");
   void connect(const byte host[], int port = 80, const char protocol[] = NULL, const char path[] = "/");
   bool connected();
@@ -55,7 +82,7 @@ public:
   void onError(OnError function);
   bool send(char* message);
 private:
-String WebSocketClientStringTable = {
+String SBSWebSocketClientStringTable = {
 			"GET / HTTP/1.1\x0d\x0a"//, //"GET {0} HTTP/1.1",
 			"Upgrade: websocket\x0d\x0a"//,
 			"Connection: Upgrade\x0d\x0a"//,
@@ -65,7 +92,6 @@ String WebSocketClientStringTable = {
 			"Origin: SparkWebSocketClient\x0d\x0a"//,
 			"Sec-WebSocket-Key:  1VTFj/CydlBCZDucDqw8eA==\x0d\x0a"//,
 			"Sec-WebSocket-Version: 13\x0d\x0a"//,
-//			"HTTP/1.1 101\x0d\x0a"
 			"\x0d\x0a"};
 
   const char* _hostname;

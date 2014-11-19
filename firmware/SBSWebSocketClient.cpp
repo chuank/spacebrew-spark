@@ -1,4 +1,31 @@
 /*
+SBSparkWebSocketClient, a websocket client specfically for spacebrew and spark devices
+
+The MIT License (MIT)
+
+Copyright (c) [2014] [Chuan Khoo]
+http://www.chuank.com
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+/*
  WebsocketClient, a websocket client for Arduino
  Copyright 2011 Kevin Rohling
  Copyright 2012 Ian Moore
@@ -22,7 +49,7 @@
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
- */
+*/
 
 /*
  * Base64 Ecoding Only Copyright (c) 1996-1999 by Internet Software Consortium.
@@ -68,17 +95,15 @@
 
 #define HANDSHAKE // uncomment to print out the sent and received handshake messages
 // #define TRACE // uncomment to support TRACE level debugging of wire protocol
-#define DEBUGGING // turn on debugging
+// #define TRACEOUT  // uncomment to print outgoing websocket messages (causes issues if you have analog output)
+#define TRACEIN   // uncomment to print incoming websocket messages
+#define DEBUG // turn on debugging
 
 #include "Spark-Websockets.h"
-// #include <stdlib.h>
-// #include <stdarg.h>
-// #include <stdlib.h>
-// #include <string.h>
 
 //char *stringVar = "{0}";
 
-void WebSocketClient::connect(const char hostname[], int port, const char protocol[], const char path[]) {
+void SBSWebSocketClient::connect(const char hostname[], int port, const char protocol[], const char path[]) {
   _hostname = hostname;
   _port = port;
   _protocol = protocol;
@@ -88,11 +113,11 @@ void WebSocketClient::connect(const char hostname[], int port, const char protoc
 }
 
 
-void WebSocketClient::reconnect() {
+void SBSWebSocketClient::reconnect() {
   bool result = false;
   bool isconnected = false;
-	#ifdef DEBUGGING
-	Serial.println("Connecting...");
+	#ifdef DEBUG
+	Serial.println("[info] Connecting websocket...");
 	#endif
 	//byte server[] = { 192, 168, 1, 100 };
 	int i, count;
@@ -110,18 +135,18 @@ void WebSocketClient::reconnect() {
 	}
 	if(isconnected)
 	{
-		#ifdef DEBUGGING
-		Serial.println("Connected, sending handshake.");
+		#ifdef DEBUG
+		Serial.println("[info] Connected, sending handshake...");
 		#endif
 		sendHandshake(_hostname, _path, _protocol);
 		result = readHandshake();
 	}
   if(!result) {
-    #ifdef DEBUGGING
-    Serial.println("Connection Failed!");
+    #ifdef DEBUG
+    Serial.println("[error] Connection Failed!");
     #endif
     if(_onError != NULL) {
-      _onError(*this, "Connection Failed!");
+      _onError(*this, "[error] Connection Failed!");
     }
     _client.stop();
   } else {
@@ -131,39 +156,37 @@ void WebSocketClient::reconnect() {
   }
 }
 
-bool WebSocketClient::connected() {
+bool SBSWebSocketClient::connected() {
   return _client.connected();
 }
 
-void WebSocketClient::disconnect() {
+void SBSWebSocketClient::disconnect() {
   _client.stop();
 }
 
-byte WebSocketClient::nextByte() {
-  while(_client.available() == 0);
-  byte b = _client.read();
+byte SBSWebSocketClient::nextByte() {
+  //while(_client.available() == 0);
+  byte b;
+  if(_client.available()>0) {
+    b = _client.read();
+  } else {
+    b = -1;
+  }
 
-  #ifdef DEBUGGING
+  #ifdef DEBUG
   if(b < 0) {
-    Serial.println("Internal Error in Ethernet Client Library (-1 returned where >= 0 expected)");
+    Serial.println("[error] TCPClient Internal Error (-1 returned where >= 0 expected)");
   }
   #endif
 
   return b;
 }
 
-void WebSocketClient::monitor () {
+void SBSWebSocketClient::monitor () {
 
   if(!_canConnect) {
-    #ifdef DEBUGGING
-    Serial.println("@@@ cannot connect");
-    #endif
-    return;
-  }
-
-  if(_reconnecting) {
-    #ifdef DEBUGGING
-    Serial.println("@@@ reconnecting");
+    #ifdef DEBUG
+    Serial.println("[error] cannot connect");
     #endif
     return;
   }
@@ -171,44 +194,34 @@ void WebSocketClient::monitor () {
   if(!connected() && millis() > _retryTimeout) {
     _retryTimeout = millis() + RETRY_TIMEOUT;
     _reconnecting = true;
-    #ifdef DEBUGGING
-    Serial.println("@@@ websocket: reconnecting...");
+    #ifdef DEBUG
+    Serial.println("[info] websocket: reconnecting...");
     #endif
     reconnect();
     _reconnecting = false;
     return;
   }
 
-  // Serial.println(_client.available());
-
 	if (_client.available() > 2) {
-    #ifdef DEBUGGING
-    // Serial.print("+");   // we should get a regular ping from the server
-    #endif
-
     byte hdr = nextByte();
-    bool fin = hdr & 0x80;
-
-    #ifdef TRACE
-    Serial.print("fin = ");
-    Serial.println(fin);
-    #endif
+    bool fin = hdr & 0x80;  // are we looking at the concluding data frame?
 
     int opCode = hdr & 0x0F;
-
-    #ifdef TRACE
-    Serial.print("op = ");
-    Serial.println(opCode);
-    #endif
 
     hdr = nextByte();
     bool mask = hdr & 0x80;
     int len = hdr & 0x7F;
     if(len == 126) {
+      #ifdef DEBUG
+      Serial.println("[info] len header: 16-bit");
+      #endif
       len = nextByte();
       len <<= 8;
       len += nextByte();
     } else if (len == 127) {
+      #ifdef DEBUG
+      Serial.println("[info] len header: 64-bit");
+      #endif
       len = nextByte();
       for(int i = 0; i < 7; i++) { // NOTE: This may not be correct.  RFC 6455 defines network byte order(??). (section 5.2)
         len <<= 8;
@@ -217,7 +230,11 @@ void WebSocketClient::monitor () {
     }
 
     #ifdef TRACE
-    Serial.print("len = ");
+    Serial.print("[trace] fin = ");
+    Serial.print(fin);
+    Serial.print(", op = ");
+    Serial.print(opCode);
+    Serial.print(", len = ");
     Serial.println(len);
     #endif
 
@@ -229,73 +246,94 @@ void WebSocketClient::monitor () {
 
     if(mask) {
 
-    #ifdef DEBUGGING
-    Serial.println("Masking not yet supported (RFC 6455 section 5.3)");
+    #ifdef DEBUG
+    Serial.println("[error] Masking not yet supported (RFC 6455 section 5.3)");
     #endif
 
       if(_onError != NULL) {
-        _onError(*this, "Masking not supported");
+        _onError(*this, "[error] Masking not supported");
       }
       free(_packet);
       return;
     }
 
-    if(!fin) {
-      if(_packet == NULL) {
+    if(!fin) {                  // absence of fin bit in data frame message has subsequent data frame(s) coming!
+      if(_packet == NULL) {                   // brand new data frame
+        // FIXME process message data here, but issues w/memory leak due to insufficient buffer
+
+        #ifdef DEBUG
+        Serial.println("[info] single packet + !FIN");
+        #endif
+
         _packet = (char*) malloc(len);
 
         uint8_t temppack[len];
-	      _client.read(temppack, len);
+        _client.read(temppack, len);
         for(int i = 0; i < len; i++) {
           _packet[i] = (char)temppack[i];
         }
-        // for(int i = 0; i < len; i++) {
-        //   _packet[i] = nextByte();
-        // }
-
         _packetLength = len;
         _opCode = opCode;
-      } else {
+      } else {                                // data frame continues from previous packet (_packet != NULL)
+        #ifdef DEBUG
+        Serial.println("[info] continuation packet + !FIN");
+        #endif
+
         int copyLen = _packetLength;
         _packetLength += len;
         char *temp = _packet;
         _packet = (char*)malloc(_packetLength);
+
         for(int i = 0; i < copyLen; i++) {
-          if(i < copyLen) {
-            _packet[i] = temp[i];
-          } else {
-            _packet[i] = nextByte();
-          }
+          _packet[i] = temp[i];               // preserve previous _packet data
         }
+        uint8_t temppack[len];
+        _client.read(temppack, len);
+        for(int i = 0; i < len; i++) {        // add to existing _packet data
+          _packet[i+copyLen] = (char)temppack[i];
+        }
+
         free(temp);
       }
-      return;
+      return;     // bail out early, as there's more data frame(s) to process
     }
 
-    if(_packet == NULL) {
+    // from here on, FIN bit is present, therefore this is the concluding data frame
+    if(_packet == NULL) {             // brand new data frame
+      #ifdef DEBUG
+      if(len!=4) {      // 4 == ping (0D 0A 0D 0A)
+        Serial.println("\r\n[info] single packet + FIN");
+      }
+      #endif
+
       _packet = (char*) malloc(len + 1);
       uint8_t temppack[len];
       _client.read(temppack, len);
       for(int i = 0; i < len; i++) {
         _packet[i] = (char)temppack[i];
       }
-      // for(int i = 0; i < len; i++) {
-      //   _packet[i] = nextByte();
-      // }
-      _packet[len] = 0x0;
-    } else {
+      _packet[len] = 0x0;             // FIN, so put in the terminating char
+
+    } else {                          // data frame continues from previous packet (_packet != NULL)
+      #ifdef DEBUG
+      Serial.println("\r\n[info] continuation packet + FIN");
+      #endif
+
       int copyLen = _packetLength;
       _packetLength += len;
       char *temp = _packet;
       _packet = (char*) malloc(_packetLength + 1);
-      for(int i = 0; i < _packetLength; i++) {
-        if(i < copyLen) {
-          _packet[i] = temp[i];
-        } else {
-          _packet[i] = nextByte();
-        }
+
+      for(int i = 0; i < copyLen; i++) {
+        _packet[i] = temp[i];                 // preserve previous _packet data
       }
-      _packet[_packetLength] = 0x0;
+      uint8_t temppack[len];
+      _client.read(temppack, len);
+      for(int i = 0; i < len; i++) {          // add to existing _packet data
+        _packet[i+copyLen] = (char)temppack[i];
+      }
+
+      _packet[_packetLength] = 0x0;   // FIN, so put in the terminating char
       free(temp);
     }
 
@@ -304,36 +342,68 @@ void WebSocketClient::monitor () {
       _opCode = 0;
     }
 
+    #ifdef DEBUG
+    if(opCode!=9) {
+      Serial.print("[info] opCode: ");
+      Serial.println(opCode,HEX);
+    }
+    #endif
+
     switch(opCode) {
       case 0x00:
-        #ifdef DEBUGGING
-        Serial.println("Unexpected Continuation OpCode");
+        #ifdef DEBUG
+        Serial.println("[error] Unexpected Continuation OpCode");
         #endif
         break;
 
       case 0x01:          // incoming message
-        #ifdef DEBUGGING
-      	// Serial.print("onMessage: data = ");
-      	// Serial.println(_packet);
-        #endif
-
         if (_onMessage != NULL) {
-          _onMessage(*this, _packet);
+          if(strstr(_packet, "}}") == NULL) {   // FIXME attempt to make sure spacebrew data is valid
+            #ifdef DEBUG
+            Serial.print("[error] malformed data: ");
+            Serial.println(_packet);
+            Serial.println("[### CRITICAL ###] BUFFER OVERRUN; attempting reconnect");
+            #endif
+
+            // FIXME bail out and reconnect
+
+            _client.flush();
+            free(_packet);
+            _packet = NULL;
+
+            unsigned int code = ((byte)_packet[0] << 8) + (byte)_packet[1];
+            if(_onClose != NULL) {
+              _onClose(*this, code, (_packet + 2));
+            }
+            _client.stop();           // monitor() method takes care of reconnection!
+            delay(RECONNECT_TIMEOUT);
+
+          } else {
+            #ifdef DEBUG
+            Serial.print("[info] incoming (");
+            Serial.print(len);
+            Serial.print(") : ");
+            Serial.println(_packet);
+            #endif
+
+            _onMessage(*this, _packet);
+          }
+
         }
         break;
 
-      case 0x02:
-        #ifdef DEBUGGING
-        Serial.println("Binary messages not yet supported (RFC 6455 section 5.6)");
+      case 0x02:        // binary message
+        #ifdef DEBUG
+        Serial.println("[error] Binary messages not yet supported (RFC 6455 section 5.6)");
         #endif
 
         if(_onError != NULL) {
-          _onError(*this, "Binary Messages not supported");
+          _onError(*this, "[error] Binary Messages not supported");
         }
         break;
 
       case 0x09:          // ping
-        #ifdef DEBUGGING
+        #ifdef DEBUG
 	      Serial.print(".");
         #endif
 
@@ -343,19 +413,19 @@ void WebSocketClient::monitor () {
         break;
 
       case 0x0A:          // pong
-        #ifdef DEBUGGING
-      	Serial.print("onPong");
+        #ifdef DEBUG
+      	Serial.print("[info] someone pong'ed me");
         #endif
         break;
 
-      case 0x08:
+      case 0x08:          // close connection
         unsigned int code = ((byte)_packet[0] << 8) + (byte)_packet[1];
 
-        #ifdef DEBUGGING
-    		Serial.print("onClose code=");
+        #ifdef DEBUG
+    		Serial.print("[info] onClose code = ");
         Serial.println(code);
-        //Serial.print(" message = ");
-        //Serial.print(message);
+        Serial.print(", message = ");
+        Serial.print(_packet);
         #endif
 
         if(_onClose != NULL) {
@@ -367,53 +437,57 @@ void WebSocketClient::monitor () {
 
     free(_packet);
     _packet = NULL;
-  } else {
-    Spark.process();
   }
 }
 
-void WebSocketClient::onMessage(OnMessage fn) {
+void SBSWebSocketClient::onMessage(OnMessage fn) {
   _onMessage = fn;
 }
 
-void WebSocketClient::onOpen(OnOpen fn) {
+void SBSWebSocketClient::onOpen(OnOpen fn) {
   _onOpen = fn;
 }
 
-void WebSocketClient::onClose(OnClose fn) {
+void SBSWebSocketClient::onClose(OnClose fn) {
   _onClose = fn;
 }
 
-void WebSocketClient::onError(OnError fn) {
+void SBSWebSocketClient::onError(OnError fn) {
   _onError = fn;
 }
 
-
-void WebSocketClient::sendHandshake(const char* hostname, const char* path, const char* protocol) {
-  #ifdef DEBUGGING
-  Serial.println("Sending handshake!");
+void SBSWebSocketClient::sendHandshake(const char* hostname, const char* path, const char* protocol) {
+  #ifdef DEBUG
+  Serial.println("[info] Sending handshake!");
   #endif
 
-  WebSocketClientStringTable.replace("{0}", hostname);
+  SBSWebSocketClientStringTable.replace("{0}", hostname);
   String strport = String(_port);
-  WebSocketClientStringTable.replace("{1}", strport);
+  SBSWebSocketClientStringTable.replace("{1}", strport);
 
-  _client.print(WebSocketClientStringTable);
+  // FIXME
+  int blen = SBSWebSocketClientStringTable.length();
+  char buf[blen+1];
+  SBSWebSocketClientStringTable.toCharArray(buf,blen);
+  _client.write((uint8_t *)buf,blen);
+  // _client.print(SBSWebSocketClientStringTable);
+
+
   #ifdef HANDSHAKE
-  Serial.println(WebSocketClientStringTable);
-  Serial.println("Handshake sent");
+  Serial.println("[info] Handshake sent: ");
+  Serial.println(SBSWebSocketClientStringTable);
   #endif
 }
 
-bool WebSocketClient::readHandshake() {
+bool SBSWebSocketClient::readHandshake() {
   #ifdef HANDSHAKE
-	Serial.println("Reading handshake!");
+	Serial.println("[info] Reading handshake!");
   #endif
   bool result = true;
   char line[128];
   int maxAttempts = 300, attempts = 0;
   //char response;
-  //response = reinterpret_cast<char>(WebSocketClientStringTable[9]);
+  //response = reinterpret_cast<char>(SBSWebSocketClientStringTable[9]);
 
   while(_client.available() == 0 && attempts < maxAttempts) {
     delay(50);
@@ -423,7 +497,7 @@ bool WebSocketClient::readHandshake() {
   while(true) {
     readLine(line);
     #ifdef HANDSHAKE
-    Serial.print("handshake rcvd line: ");
+    Serial.print("[info] handshake rcvd line: ");
     Serial.println(line);
     #endif
 
@@ -436,21 +510,21 @@ bool WebSocketClient::readHandshake() {
   }
 
   if(!result) {
-    #ifdef DEBUGGING
-    Serial.println("Handshake Failed! Terminating");
+    #ifdef DEBUG
+    Serial.println("[error] Handshake Failed! Terminating");
     #endif
     _client.stop();
   }
   else
 	{
-    #ifdef DEBUGGING
-	  Serial.println("Handshake Ok!");
+    #ifdef DEBUG
+	  Serial.println("[info] Handshake Ok!");
     #endif
 	}
   return result;
 }
 
-void WebSocketClient::readLine(char* buffer) {
+void SBSWebSocketClient::readLine(char* buffer) {
   char character;
 
   int i = 0;
@@ -463,7 +537,7 @@ void WebSocketClient::readLine(char* buffer) {
   buffer[i] = 0x0;
 }
 
-bool WebSocketClient::send (char* message) {
+bool SBSWebSocketClient::send (char* message) {
   if(!_canConnect || _reconnecting) {
     return false;
   }
@@ -479,18 +553,20 @@ bool WebSocketClient::send (char* message) {
   for(int i = 0; i < 4; i++) {
     _client.write((byte)0x00); // use 0x00 for mask bytes which is effectively a NOOP
   }
-  _client.print(message);
-  #ifdef TRACE
-  Serial.print("message sent: ");
-  Serial.print(_client.connected());  // STOPPED HERE, STILL TRUE (1) WHEN PING BREAKS!!!
-  Serial.print(" ");
+
+  #ifdef TRACEOUT
+  Serial.print("[trace] outgoing (length:");
+  Serial.print(strlen(message));
+  Serial.print(") : ");
   Serial.println(message);
   #endif
+
+  _client.write((uint8_t *)message, len);
   return true;
 }
 
 
-size_t WebSocketClient::base64Encode(byte* src, size_t srclength, char* target, size_t targsize) {
+size_t SBSWebSocketClient::base64Encode(byte* src, size_t srclength, char* target, size_t targsize) {
 
   size_t datalength = 0;
 	char input[3];
@@ -549,7 +625,7 @@ size_t WebSocketClient::base64Encode(byte* src, size_t srclength, char* target, 
 	return (datalength);
 }
 
-void WebSocketClient::generateHash(char buffer[], size_t bufferlen) {
+void SBSWebSocketClient::generateHash(char buffer[], size_t bufferlen) {
   byte bytes[16];
   for(int i = 0; i < 16; i++) {
     bytes[i] = rand() % 255 + 1;

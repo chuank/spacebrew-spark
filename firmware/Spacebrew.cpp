@@ -1,16 +1,15 @@
 #include "spark_wiring_usbserial.h"
 #include "Spacebrew.h"
-// #include <stdlib.h>
 
 Spacebrew::Spacebrew(){
-//  client.onOpen((void(WebSocketClientCallback::*)(WebSocketClient))&Spacebrew::onOpen, this);
-//  client.onClose((void(WebSocketClientCallback::*)(WebSocketClient, int, char*))&Spacebrew::onClose, this);
-//  client.onMessage((void(WebSocketClientCallback::*)(WebSocketClient, char*))&Spacebrew::onMessage, this);
-//  client.onError((void(WebSocketClientCallback::*)(WebSocketClient, char*))&Spacebrew::onError, this);
-  client.onOpen(onWSOpen);
-  client.onClose(onWSClose);
-  client.onMessage(onWSMessage);
-  client.onError(onWSError);
+//  wsclient.onOpen((void(SBSWebSocketClientCallback::*)(SBSWebSocketClient))&Spacebrew::onOpen, this);
+//  wsclient.onClose((void(SBSWebSocketClientCallback::*)(SBSWebSocketClient, int, char*))&Spacebrew::onClose, this);
+//  wsclient.onMessage((void(SBSWebSocketClientCallback::*)(SBSWebSocketClient, char*))&Spacebrew::onMessage, this);
+//  wsclient.onError((void(SBSWebSocketClientCallback::*)(SBSWebSocketClient, char*))&Spacebrew::onError, this);
+  wsclient.onOpen(onWSOpen);
+  wsclient.onClose(onWSClose);
+  wsclient.onMessage(onWSMessage);
+  wsclient.onError(onWSError);
   m_bOpen = m_bSendConfig = false;
 }
 
@@ -24,13 +23,13 @@ Spacebrew::OnSBOpen Spacebrew::_onOpen = NULL;
 Spacebrew::OnSBClose Spacebrew::_onClose = NULL;
 Spacebrew::OnSBError Spacebrew::_onError = NULL;
 
-void Spacebrew::onWSError(WebSocketClient client, char* message){
+void Spacebrew::onWSError(SBSWebSocketClient wsclient, char* message){
   if (_onError != NULL){
     _onError(message);
   }
 }
 
-void Spacebrew::onWSOpen(WebSocketClient client){
+void Spacebrew::onWSOpen(SBSWebSocketClient wsclient){
   m_bOpen = true;
   m_bSendConfig = true;
   if (_onOpen != NULL){
@@ -38,7 +37,7 @@ void Spacebrew::onWSOpen(WebSocketClient client){
   }
 }
 
-void Spacebrew::onWSClose(WebSocketClient client, int code, char* message){
+void Spacebrew::onWSClose(SBSWebSocketClient wsclient, int code, char* message){
   m_bOpen = false;
   if (_onClose != NULL){
     _onClose(code, message);
@@ -103,11 +102,16 @@ void Spacebrew::sendConfig(){
     }
   }
   strcat(b, c9);
-  client.send(b);
+
+  #ifdef DEBUG
+  Serial.print("[info] sending configuration: ");
+  Serial.println(b);
+  #endif
+  wsclient.send(b);
 }
 
 void Spacebrew::connect(char hostname[], char* clientName, char* description, int port){
-  client.connect(hostname, port);
+  wsclient.connect(hostname, port);
   m_sClientName = clientName;
   m_sDescription = description;
 }
@@ -171,21 +175,10 @@ void Spacebrew::connect(char hostname[], char* clientName, char* description, in
       #ifdef DEBUG
       Serial.println("### Spacebrew: DISCONNECTED");
       #endif
-      client.disconnect();
+      wsclient.disconnect();
       m_bOpen = false;
     }
-    void Spacebrew::onWSMessage(WebSocketClient client, char* message){
-      #ifdef DEBUG
-      int msglen = strlen(message);
-      if(msglen>126) {
-        Serial.print("WARNING: message buffer overflow!");
-      } else {
-        Serial.print("incoming (length:");
-        Serial.print(strlen(message));
-        Serial.print(") : ");
-        Serial.println(message);
-      }
-      #endif
+    void Spacebrew::onWSMessage(SBSWebSocketClient wsclient, char* message){
       const char *i1 = "{\"message\":{\"name\":\"",
                   *i2 = "\",\"type\":\"",
                   *i3 = "\",\"value\":\"";
@@ -240,7 +233,7 @@ void Spacebrew::connect(char hostname[], char* clientName, char* description, in
       strcat(b, m4);
       strcat(b, value);
       strcat(b, m5);
-      client.send(b);
+      if(wsclient.connected()) wsclient.send(b);
     }
     bool Spacebrew::send(char* name, int value){
       char sVal[5];
@@ -252,12 +245,11 @@ void Spacebrew::connect(char hostname[], char* clientName, char* description, in
         _onError(message);
       }
     }
-    void Spacebrew::monitor(){
-      client.monitor();
-      if (m_bOpen){
-        if (m_bSendConfig){
-          m_bSendConfig = false;
-          sendConfig();
-        }
+    void Spacebrew::monitor() {
+      wsclient.monitor();
+
+      if (m_bOpen && m_bSendConfig){
+        m_bSendConfig = false;
+        sendConfig();
       }
     }

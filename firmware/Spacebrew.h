@@ -1,7 +1,7 @@
 #ifndef SPACEBREW_H
 #define SPACEBREW_H
 
-#include "Spark-Websockets.h"
+#include "SBSWebSocketClient.h"
 
 enum SBType { SB_BOOLEAN, SB_STRING, SB_RANGE };
 struct PublisherNode {
@@ -89,7 +89,7 @@ class Spacebrew{
     //void addSubscribe(char* name, SBType type, OnBooleanMessage function);
     //void addSubscribe(char* name, SBType type, OnRangeMessage function);
     //void addSubscribe(char* name, SBType type, OnStringMessage function);
-    void connect(char hostname[], char clientName[], char description[], int port = 9000);
+    void connect(char hostname[], char wsclientName[], char description[], int port = 9000);
     void disconnect();
     bool send(char name[], char type[], char value[]);
     bool send(char name[], SBType type, char value[]){
@@ -112,14 +112,14 @@ class Spacebrew{
       send(name, (char*)"boolean", (char*)(value ? "true" : "false"));
     }
     bool send(char name[], int value);
-    static void onWSError(WebSocketClient client, char* message);//defined in WebSocketClientCallback
-    static void onWSOpen(WebSocketClient client);
-    static void onWSClose(WebSocketClient client, int code, char* message);
-    static void onWSMessage(WebSocketClient client, char* message);
+    static void onWSError(SBSWebSocketClient wsclient, char* message);//defined in SBSWebSocketClientCallback
+    static void onWSOpen(SBSWebSocketClient wsclient);
+    static void onWSClose(SBSWebSocketClient wsclient, int code, char* message);
+    static void onWSMessage(SBSWebSocketClient wsclient, char* message);
 
   private:
     uint8_t mac[6];
-    WebSocketClient client;
+    SBSWebSocketClient wsclient;
     static bool m_bOpen;
     static bool m_bSendConfig;
     char* m_sClientName;

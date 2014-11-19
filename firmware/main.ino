@@ -1,37 +1,42 @@
-//SYSTEM_MODE(MANUAL);
+SYSTEM_MODE(MANUAL);
 
 #include "Spacebrew.h"
 
 Spacebrew sb;
 
 // name + descriptor for Spacebrew
-#define APP_NAME  "NormalNinja"
+#define APP_NAME  "SparkCore"
 #define APP_DESC  "Trying out Spark Cores with Spacebrew!"
-#define BTNPIN    D3
-#define LEDPIN    D1
-#define STPIN     D0
-#define APIN      A0
+
+#define BTNPIN    D3      // button (pullup), connected as Spacebrew publisher
+#define LEDPIN    D1      // LED to D1, connected as Spacebrew subscriber
+#define STPIN     D0      // when ON, Spacebrew connected
+#define APIN      A0      // analog pin, connected as Spacebrew publisher
 
 int lastBtnState = 0;
 int lastAnalog = -1;
 
 void setup() {
+  WiFi.connect();             // not using Spark Cloud so turn on WiFi manually
+  while(!WiFi.ready());       // wait for WiFi to establish connection
+
   Serial.begin(38400);
   delay(2000);
+
+  // debug purposes - uncomment next 2 lines to start up audomatically
   Serial.println("Send any char to start");
-  while(!Serial.available())
-    Spark.process();
+  while(!Serial.available());
 
   pinMode(BTNPIN,INPUT_PULLUP);
   pinMode(LEDPIN,OUTPUT);
   pinMode(STPIN,OUTPUT);
 
-  //connect to spacebrew library info
+  //connect to Spacebrew callbacks
   sb.onOpen(onOpen);
   sb.onClose(onClose);
   sb.onError(onError);
 
-  //connect to message callbacks
+  //connect to Spacebrew message callbacks
   sb.onBooleanMessage(onBooleanMessage);
   sb.onStringMessage(onStringMessage);
   sb.onRangeMessage(onRangeMessage);
@@ -44,18 +49,16 @@ void setup() {
   sb.addSubscribe("Range", SB_RANGE);
 
   //connect to the spacebrew server
-  /*sb.connect("spacebrew.chuank.com", APP_NAME, APP_DESC);*/
-  sb.connect("192.168.2.101", APP_NAME, APP_DESC);
-
+  sb.connect("localhost", APP_NAME, APP_DESC);
 }
 
 void loop() {
-  // monitor connections first before proceeding with other code
+  // always monitor Spacebrew connection
   sb.monitor();
 
   int analogIn = map(analogRead(APIN),0,4095,0,1023);
   if (analogIn != lastAnalog){
-    //sb.send("Analog", analogIn);
+    sb.send("Analog", analogIn);
     lastAnalog = analogIn;
   }
 
@@ -65,11 +68,27 @@ void loop() {
     lastBtnState = buttonState;
   }
 
-  delay(50);    // a slight delay seems to help
+  /*delay(100);       // slow things down*/
+}
+
+void onOpen(){
+  Serial.println("### SpaceBrew: connected");
+  sb.send("R!", true);   // force a non-existent reset message on server side
+  digitalWrite(STPIN,HIGH);
+}
+
+void onClose(int code, char* message){
+  Serial.println("### SpaceBrew: closed");
+  digitalWrite(STPIN,LOW);
+}
+
+void onError(char* message) {
+  Serial.print("!!! ERROR: ");
+  Serial.println(message);
 }
 
 void onBooleanMessage(char *name, bool value) {
-  //turn the 'digital' LED on and off based on the incoming boolean
+  //turn the LED on and off based on the incoming boolean
   digitalWrite(LEDPIN, value ? HIGH : LOW);
 }
 
@@ -81,19 +100,4 @@ void onStringMessage(char *name, char *value) {
 void onRangeMessage(char *name, int value) {
   Serial.print("SB_RANGE: ");
   Serial.println(value);
-}
-
-void onOpen(){
-  //Serial.println("### SpaceBrew: connected");
-  digitalWrite(STPIN,HIGH);
-}
-
-void onClose(int code, char* message){
-  //Serial.print("### SpaceBrew: closed");
-  digitalWrite(STPIN,LOW);
-}
-
-void onError(char* message) {
-  //Serial.print("!!! ERROR: ");
-  //Serial.println(message);
 }

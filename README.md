@@ -1,4 +1,4 @@
-#spacebrew-sparkcore
+#Spacebrew-Spark
 
 **[SpaceBrew](docs.spacebrew.cc) + [Spark Core](spark.io) integration**
 

@@ -39,8 +39,8 @@ The WebSocketClient implementation started off from ekbduffy's Spark WebSocket..
 
 https://github.com/ekbduffy/spark_websockets
 
-...which is itself a Spark Core derivative of the Arduino Websocket library:
+...which is itself a Spark Core derivative of the following ArduinoWebsocketClient library:
 
-https://github.com/brandenhall/Arduino-Websocket
+https://github.com/labatrockwell/ArduinoWebsocketClient
 
 Many thanks go out to ekbduffy for running through some of the tests.

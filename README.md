@@ -35,7 +35,7 @@ In addition, due to the limitations of the Spark's `TCPClient` and the original 
 The SpaceBrew portion is a port from the original SpaceBrew-Arduino library by LAB@Rockwell:
 https://github.com/labatrockwell/spacebrew-arduino-library
 
-The WebSocketClient implementation started off from ekbduffy's Spark WebSocket...
+The WebSocketClient implementation started off from ekbduffy's spark_webSockets...
 
 https://github.com/ekbduffy/spark_websockets
 

@@ -1,6 +1,6 @@
-#Spacebrew-Spark
+#spacebrew-spark
 
-**[SpaceBrew](docs.spacebrew.cc) + [Spark Core](spark.io) integration**
+**[spacebrew](docs.spacebrew.cc) + [Spark Core](spark.io) integration**
 
 An attempt in getting SpaceBrew and the Spark Core to talk nice to one another.
 

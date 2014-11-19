@@ -43,4 +43,4 @@ https://github.com/ekbduffy/spark_websockets
 
 https://github.com/labatrockwell/ArduinoWebsocketClient
 
-Many thanks go out to ekbduffy for running through some of the tests.
+Many thanks go out to ekbduffy for running through some of the tests with me.

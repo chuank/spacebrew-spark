@@ -24,7 +24,7 @@ In addition, due to the limitations of the Spark's `TCPClient` and the original 
 * Successive messages sent rapidly to the Spark Core are **guaranteed** to trigger the websocket disconnect-connect sequence.
 * Monitor the serial port to understand what's happening to your code, and find out when your Spark Core disconnects. At this point in time there seems to be only 2 ways to address/minimize the reconnects:
   1. Slow down the message rate of your data source that's headed for the Spark Core
-  2. Edit the Spark firmware source code: under `spark_wiring_tcpclient.h`, look for `TCPCLIENT_BUF_MAX_SIZE` and increase the buffer size (you then have to recompile the spark firmware binaries and then compile your Spark firmware locally)
+  2. Edit the [Spark firmware](https://github.com/spark/firmware) source code: under `spark_wiring_tcpclient.h`, look for `TCPCLIENT_BUF_MAX_SIZE` and increase the buffer size (you then have to recompile the spark/firmware binaries and then compile your Spark firmware locally)
 
 ##Todo
 * Base64 encoding for proper handshaking

@@ -67,7 +67,7 @@ void loop() {
     lastBtnState = buttonState;
   }
 
-  /*delay(100);       // slow things down*/
+  delay(10);       // slow things down
 }
 
 void onOpen(){

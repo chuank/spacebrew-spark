@@ -17,4 +17,4 @@ Thumbs.db
 *.obj
 
 # debugging
-*.log
+serialport*

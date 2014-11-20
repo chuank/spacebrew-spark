@@ -8,6 +8,8 @@ Due to the TCP buffer size of 128 bytes set in the build IDE of the [Spark Core]
 
 This implementation works around this issue by dropping the websocket connection right before the buffer overrun hits, flushing the buffer and automatically reconnecting. The down time between the Spark Core and the Spacebrew server is reduced to about 1 second (local network Spacebrew server), and re-establishes itself to the Spacebrew server on its own. Essentially your Spark Core continues running (without needing to reboot), and Spacebrew continues working (although it will report a disconnect+connect).
 
+##How-to
+Refer to `main.ino` for an example.
 
 ##Limitations
 The implementations here focus on exposing typical microcontroller-centric tasks to the Spacebrew server. Therefore, the features are kept lightweight and are intended to support the basic Spacebrew datatypes: `Boolean`, `String` and `Range`.

@@ -1,4 +1,4 @@
-SYSTEM_MODE(MANUAL);
+SYSTEM_MODE(MANUAL);      // MANUAL mode; full attention to Spacebrew websocket server required
 
 #include "Spacebrew.h"
 Spacebrew sb;
@@ -16,13 +16,13 @@ int lastBtnState = 0;
 int lastAnalog = -1;
 
 void setup() {
-  WiFi.connect();             // not using Spark Cloud so turn on WiFi manually
+  WiFi.connect();             // not using Spark Cloud, so turn on WiFi manually
   while(!WiFi.ready());       // wait for WiFi to establish connection
 
   Serial.begin(38400);
   delay(2000);
 
-  // debug purposes - uncomment next 2 lines to start up audomatically
+  // debug purposes - uncomment next 2 lines to start up automatically
   Serial.println("Send any char to start");
   while(!Serial.available());
 
@@ -48,7 +48,7 @@ void setup() {
   sb.addSubscribe("Range", SB_RANGE);
 
   //connect to the spacebrew server
-  sb.connect("localhost", APP_NAME, APP_DESC);
+  sb.connect("192.168.2.101", APP_NAME, APP_DESC);      // 'localhost' does not work, use IP instead
 }
 
 void loop() {
@@ -67,9 +67,11 @@ void loop() {
     lastBtnState = buttonState;
   }
 
-  delay(10);       // slow things down
+  delay(10);       // slow things down a touch
 }
 
+
+// Spacebrew callbacks
 void onOpen(){
   Serial.println("### SpaceBrew: connected");
   sb.send("R!", true);   // force a non-existent reset message on server side

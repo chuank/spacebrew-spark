@@ -18,3 +18,5 @@ Thumbs.db
 
 # debugging
 serialport*
+
+test.code/*

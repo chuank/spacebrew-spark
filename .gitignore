@@ -10,13 +10,9 @@ Thumbs.db
 # Spark core binaries
 *.bin
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# debugging
+# debugging/test code
 serialport*
-
 test.code/*
+
+# RPi backup images
+*.rpi

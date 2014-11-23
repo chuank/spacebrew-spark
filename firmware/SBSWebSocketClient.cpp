@@ -1,9 +1,9 @@
 /*
-SBSWebSocketClient, a websocket client specfically for spacebrew and spark devices
+SBSWebSocketClient, a websocket client tuned specifically for Spacebrew and Spark devices
 
 The MIT License (MIT)
 
-Copyright (c) [2014] [Chuan Khoo]
+Copyright (c) 2014 Chuan Khoo
 http://www.chuank.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -101,7 +101,6 @@ SOFTWARE.
 
 #include "SBSWebSocketClient.h"
 
-
 void SBSWebSocketClient::connect(const char hostname[], int port, const char protocol[], const char path[]) {
   _hostname = hostname;
   _port = port;
@@ -109,45 +108,57 @@ void SBSWebSocketClient::connect(const char hostname[], int port, const char pro
   _path = path;
   _retryTimeout = millis();
   _canConnect = true;
+  _sendingConfig = false;
 }
-
 
 void SBSWebSocketClient::reconnect() {
   bool result = false;
   bool isconnected = false;
 	#ifdef DEBUG
-	Serial.println("[info] Connecting websocket...");
+	Serial.print("[info] Connecting websocket at: ");
+  Serial.print(_hostname);
 	#endif
-	//byte server[] = { 192, 168, 1, 100 };
+
 	int i, count;
 	for (i=0, count=0; _hostname[i]; i++)
 	  count += (_hostname[i] == '.');
 	if (count == 3)
 	{
+    #ifdef DEBUG
+    Serial.println(" (IP)");
+    #endif
 		byte ip[4];
 		sscanf(_hostname, "%hu.%hu.%hu.%hu", &ip[0], &ip[1], &ip[2], &ip[3]);
-		isconnected = _client.connect(ip, _port);
+		isconnected = _tcpclient.connect(ip, _port);
+	} else {
+    #ifdef DEBUG
+    Serial.println(" (hostname)");
+    #endif
+		isconnected = _tcpclient.connect(_hostname, _port);
 	}
-	else
-	{
-		isconnected = _client.connect(_hostname, _port);
-	}
+
+  delay(100);               // delay allows slower servers (e.g. RPi) to respond
+
 	if(isconnected)
 	{
 		#ifdef DEBUG
 		Serial.println("[info] Connected, sending handshake...");
 		#endif
+    // _tcpclient.flush();
 		sendHandshake(_hostname, _path, _protocol);
+    // FIXME #5 will adding a delay work?
+    delay(250);
 		result = readHandshake();
 	}
+
   if(!result) {
-    #ifdef DEBUG
-    Serial.println("[error] Connection Failed!");
-    #endif
+    // #ifdef DEBUG
+    // Serial.println("[error] Connection Failed!");
+    // #endif
     if(_onError != NULL) {
       _onError(*this, "[error] Connection Failed!");
     }
-    _client.stop();
+    _tcpclient.stop();
   } else {
       if(_onOpen != NULL) {
           _onOpen(*this);
@@ -156,18 +167,18 @@ void SBSWebSocketClient::reconnect() {
 }
 
 bool SBSWebSocketClient::connected() {
-  return _client.connected();
+  return _tcpclient.connected();
 }
 
 void SBSWebSocketClient::disconnect() {
-  _client.stop();
+  _tcpclient.stop();
 }
 
 byte SBSWebSocketClient::nextByte() {
-  //while(_client.available() == 0);
+  //while(_tcpclient.available() == 0);
   byte b;
-  if(_client.available()>0) {
-    b = _client.read();
+  if(_tcpclient.available()>0) {
+    b = _tcpclient.read();
   } else {
     b = -1;
   }
@@ -194,14 +205,14 @@ void SBSWebSocketClient::monitor () {
     _retryTimeout = millis() + RETRY_TIMEOUT;
     _reconnecting = true;
     #ifdef DEBUG
-    Serial.println("[info] websocket: reconnecting...");
+    Serial.println("[info] websocket: connecting...");
     #endif
     reconnect();
     _reconnecting = false;
     return;
   }
 
-	if (_client.available() > 2) {
+	if (_tcpclient.available() > 2) {
     byte hdr = nextByte();
     bool fin = hdr & 0x80;  // are we looking at the concluding data frame?
 
@@ -258,16 +269,17 @@ void SBSWebSocketClient::monitor () {
 
     if(!fin) {                  // absence of fin bit in data frame message has subsequent data frame(s) coming!
       if(_packet == NULL) {                   // brand new data frame
-        // FIXME process message data here, but issues w/memory leak due to insufficient buffer
+        // FIXME #4 process message data here, but issues w/memory leak due to insufficient buffer
 
         #ifdef DEBUG
-        Serial.println("[info] single packet + !FIN");
+        Serial.println("[info] single frame + !FIN");
         #endif
 
+        dataType = SB_START;
         _packet = (char*) malloc(len);
 
         uint8_t temppack[len];
-        _client.read(temppack, len);
+        _tcpclient.read(temppack, len);
         for(int i = 0; i < len; i++) {
           _packet[i] = (char)temppack[i];
         }
@@ -275,8 +287,10 @@ void SBSWebSocketClient::monitor () {
         _opCode = opCode;
       } else {                                // data frame continues from previous packet (_packet != NULL)
         #ifdef DEBUG
-        Serial.println("[info] continuation packet + !FIN");
+        Serial.println("[info] continuation frame + !FIN");
         #endif
+
+        dataType = SB_MID;
 
         int copyLen = _packetLength;
         _packetLength += len;
@@ -287,7 +301,7 @@ void SBSWebSocketClient::monitor () {
           _packet[i] = temp[i];               // preserve previous _packet data
         }
         uint8_t temppack[len];
-        _client.read(temppack, len);
+        _tcpclient.read(temppack, len);
         for(int i = 0; i < len; i++) {        // add to existing _packet data
           _packet[i+copyLen] = (char)temppack[i];
         }
@@ -301,13 +315,15 @@ void SBSWebSocketClient::monitor () {
     if(_packet == NULL) {             // brand new data frame
       #ifdef DEBUG
       if(len!=4) {      // 4 == ping (0D 0A 0D 0A)
-        Serial.println("\r\n[info] single packet + FIN");
+        Serial.println("\r\n[info] single frame + FIN");
       }
       #endif
 
+      dataType = SB_END;
+
       _packet = (char*) malloc(len + 1);
       uint8_t temppack[len];
-      _client.read(temppack, len);
+      _tcpclient.read(temppack, len);
       for(int i = 0; i < len; i++) {
         _packet[i] = (char)temppack[i];
       }
@@ -315,8 +331,10 @@ void SBSWebSocketClient::monitor () {
 
     } else {                          // data frame continues from previous packet (_packet != NULL)
       #ifdef DEBUG
-      Serial.println("\r\n[info] continuation packet + FIN");
+      Serial.println("\r\n[info] continuation frame + FIN");
       #endif
+
+      dataType = SB_END;
 
       int copyLen = _packetLength;
       _packetLength += len;
@@ -327,7 +345,7 @@ void SBSWebSocketClient::monitor () {
         _packet[i] = temp[i];                 // preserve previous _packet data
       }
       uint8_t temppack[len];
-      _client.read(temppack, len);
+      _tcpclient.read(temppack, len);
       for(int i = 0; i < len; i++) {          // add to existing _packet data
         _packet[i+copyLen] = (char)temppack[i];
       }
@@ -357,27 +375,12 @@ void SBSWebSocketClient::monitor () {
 
       case 0x01:          // incoming message
         if (_onMessage != NULL) {
-          if(strstr(_packet, "}}") == NULL) {   // FIXME attempt to make sure spacebrew data is valid
-            #ifdef DEBUG
-            Serial.print("[error] malformed data: ");
-            Serial.println(_packet);
-            Serial.println("[### CRITICAL ###] BUFFER OVERRUN; attempting reconnect");
-            #endif
+          Serial.println("[[incoming data]]");
 
-            // FIXME bail out and reconnect
+          // TODO #4 do not verify if we're still awaiting response from sendconfig!!!
 
-            _client.flush();
-            free(_packet);
-            _packet = NULL;
-
-            unsigned int code = ((byte)_packet[0] << 8) + (byte)_packet[1];
-            if(_onClose != NULL) {
-              _onClose(*this, code, (_packet + 2));
-            }
-            _client.stop();           // monitor() method takes care of reconnection!
-            delay(RECONNECT_TIMEOUT);
-
-          } else {
+          if(verifyData(dataType,_packet)) {     // check for malformed data
+            // data is as expected
             #ifdef DEBUG
             Serial.print("[info] incoming (");
             Serial.print(len);
@@ -386,8 +389,26 @@ void SBSWebSocketClient::monitor () {
             #endif
 
             _onMessage(*this, _packet);
-          }
 
+          } else {
+            #ifdef DEBUG
+            Serial.print("[error] malformed data: ");
+            Serial.println(_packet);
+            Serial.println("[### CRITICAL ###] POSSIBLE BUFFER OVERRUN; attempting reconnect");
+            #endif
+
+            // FIXME #4 double-check bail out and reconnect sequence
+            _tcpclient.flush();
+            free(_packet);
+            _packet = NULL;
+
+            unsigned int code = ((byte)_packet[0] << 8) + (byte)_packet[1];
+            if(_onClose != NULL) {
+              _onClose(*this, code, (_packet + 2));
+            }
+            _tcpclient.stop();           // monitor() method takes care of reconnection!
+            delay(RECONNECT_TIMEOUT);
+          }
         }
         break;
 
@@ -406,9 +427,9 @@ void SBSWebSocketClient::monitor () {
 	      Serial.print(".");
         #endif
 
-        _client.write(0x8A);  // reply with pong
-	      // _client.write(0x8A);//_client.write(0x09);//0x0A; - pong
-        _client.write(byte(0x00));
+        //TODO OPTIMIZE/VERIFY: send as 2 bytes using client.write(buf,len)
+        _tcpclient.write(0x8A);  // reply with pong
+        _tcpclient.write(byte(0x00));
         break;
 
       case 0x0A:          // pong
@@ -430,13 +451,27 @@ void SBSWebSocketClient::monitor () {
         if(_onClose != NULL) {
           _onClose(*this, code, (_packet + 2));
         }
-        _client.stop();
+        _tcpclient.stop();
         break;
     }
 
     free(_packet);
     _packet = NULL;
   }
+}
+
+bool SBSWebSocketClient::verifyData(SBHead type, char* p) {
+  // verify integrity of Spacebrew JSON message depending on the type of frame encountered
+  switch(type) {
+    case SB_START:
+      return (strstr(p, "{\"message\":{") == NULL) ? false : true;
+    case SB_END:
+      return (strstr(p, "}}") == NULL) ? false : true;
+    case SB_MID:
+      // no way to check if it's midpoint data!
+      break;
+  }
+  return false;
 }
 
 void SBSWebSocketClient::onMessage(OnMessage fn) {
@@ -464,13 +499,13 @@ void SBSWebSocketClient::sendHandshake(const char* hostname, const char* path, c
   String strport = String(_port);
   SBSWebSocketClientStringTable.replace("{1}", strport);
 
-  // FIXME
   int blen = SBSWebSocketClientStringTable.length();
   char buf[blen+1];
   SBSWebSocketClientStringTable.toCharArray(buf,blen);
-  _client.write((uint8_t *)buf,blen);
-  // _client.print(SBSWebSocketClientStringTable);
 
+  // TODO #5
+  _tcpclient.flush();    // flush before sending handshake
+  _tcpclient.write((uint8_t *)buf,blen);
 
   #ifdef HANDSHAKE
   Serial.println("[info] Handshake sent: ");
@@ -488,7 +523,8 @@ bool SBSWebSocketClient::readHandshake() {
   //char response;
   //response = reinterpret_cast<char>(SBSWebSocketClientStringTable[9]);
 
-  while(_client.available() == 0 && attempts < maxAttempts) {
+  // blocking; wait maxAttempts * 50ms for a response from server
+  while(_tcpclient.available() == 0 && attempts < maxAttempts) {
     delay(50);
     attempts++;
   }
@@ -512,7 +548,7 @@ bool SBSWebSocketClient::readHandshake() {
     #ifdef DEBUG
     Serial.println("[error] Handshake Failed! Terminating");
     #endif
-    _client.stop();
+    _tcpclient.stop();
   }
   else
 	{
@@ -527,9 +563,8 @@ void SBSWebSocketClient::readLine(char* buffer) {
   char character;
 
   int i = 0;
-  while(_client.available() > 0 && (character = _client.read()) != '\n') {
+  while(_tcpclient.available() > 0 && (character = _tcpclient.read()) != '\n') {
     if (character != '\r' && character != -1) {
-		  //Serial.print(character);
       buffer[i++] = character;
     }
   }
@@ -541,16 +576,16 @@ bool SBSWebSocketClient::send (char* message) {
     return false;
   }
   int len = strlen(message);
-  _client.write(0x81);
+  _tcpclient.write(0x81);
   if(len > 125) {
-    _client.write(0xFE);
-    _client.write(byte(len >> 8));
-    _client.write(byte(len & 0xFF));
+    _tcpclient.write(0xFE);
+    _tcpclient.write(byte(len >> 8));
+    _tcpclient.write(byte(len & 0xFF));
   } else {
-    _client.write(0x80 | byte(len));
+    _tcpclient.write(0x80 | byte(len));
   }
   for(int i = 0; i < 4; i++) {
-    _client.write((byte)0x00); // use 0x00 for mask bytes which is effectively a NOOP
+    _tcpclient.write((byte)0x00); // use 0x00 for mask bytes which is effectively a NOOP
   }
 
   #ifdef TRACEOUT
@@ -560,8 +595,13 @@ bool SBSWebSocketClient::send (char* message) {
   Serial.println(message);
   #endif
 
-  _client.write((uint8_t *)message, len);
+  _tcpclient.write((uint8_t *)message, len);
   return true;
+}
+
+void SBSWebSocketClient::sendConfig (char* message) {
+  _sendingConfig = true;
+  send(message);
 }
 
 
@@ -625,6 +665,8 @@ size_t SBSWebSocketClient::base64Encode(byte* src, size_t srclength, char* targe
 }
 
 void SBSWebSocketClient::generateHash(char buffer[], size_t bufferlen) {
+  //TODO #2
+
   byte bytes[16];
   for(int i = 0; i < 16; i++) {
     bytes[i] = rand() % 255 + 1;

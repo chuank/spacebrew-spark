@@ -3,7 +3,9 @@ SYSTEM_MODE(MANUAL);      // MANUAL mode; full attention to Spacebrew websocket 
 #include "Spacebrew.h"
 Spacebrew sb;
 
-// name + descriptor for Spacebrew
+// Spacebrew server settings
+#define SB_HOST   "192.168.2.206"   // Spacebrew host (IP or hostname possible, .local mDNS not supported yet) // TODO #6
+#define SB_PORT   9001    // Spacebrew port (9001 for RPi due to nginx proxy_pass, default:9000)
 #define APP_NAME  "SparkCore"
 #define APP_DESC  "Trying out Spark Cores with Spacebrew!"
 
@@ -30,6 +32,7 @@ void setup() {
   pinMode(LEDPIN,OUTPUT);
   pinMode(STPIN,OUTPUT);
 
+
   //connect to Spacebrew callbacks
   sb.onOpen(onOpen);
   sb.onClose(onClose);
@@ -48,7 +51,7 @@ void setup() {
   sb.addSubscribe("Range", SB_RANGE);
 
   //connect to the spacebrew server
-  sb.connect("192.168.2.101", APP_NAME, APP_DESC);      // 'localhost' does not work, use IP instead
+  sb.connect(SB_HOST, APP_NAME, APP_DESC, SB_PORT);
 }
 
 void loop() {

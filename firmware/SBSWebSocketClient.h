@@ -1,9 +1,9 @@
 /*
-SBSWebSocketClient, a websocket client specfically for spacebrew and spark devices
+SBSWebSocketClient, a websocket client tuned specifically for Spacebrew and Spark devices
 
 The MIT License (MIT)
 
-Copyright (c) [2014] [Chuan Khoo]
+Copyright (c) 2014 Chuan Khoo
 http://www.chuank.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -65,6 +65,8 @@ SOFTWARE.
 #include "spark_wiring_tcpclient.h"
 #include "spark_wiring_string.h"
 
+enum SBHead { SB_START, SB_MID, SB_END };
+
 class SBSWebSocketClient {
 public:
   typedef void (*OnMessage)(SBSWebSocketClient client, char* message);
@@ -72,7 +74,6 @@ public:
   typedef void (*OnClose)(SBSWebSocketClient client, int code, char* message);
   typedef void (*OnError)(SBSWebSocketClient client, char* message);
   void connect(const char hostname[], int port = 80, const char protocol[] = NULL, const char path[] = "/");
-  void connect(const byte host[], int port = 80, const char protocol[] = NULL, const char path[] = "/");
   bool connected();
   void disconnect();
   void monitor();
@@ -81,18 +82,29 @@ public:
   void onMessage(OnMessage function);
   void onError(OnError function);
   bool send(char* message);
+  void sendConfig (char* message);
 private:
+
 String SBSWebSocketClientStringTable = {
-			"GET / HTTP/1.1\x0d\x0a"//, //"GET {0} HTTP/1.1",
-			"Upgrade: websocket\x0d\x0a"//,
-			"Connection: Upgrade\x0d\x0a"//,
-			"Host: {0}:{1}\x0d\x0a"//,//"Host: {0}",
-      "Pragma: no-cache\x0d\x0a"
-      "Cache-Control: no-cache\x0d\x0a"
-			"Origin: SparkWebSocketClient\x0d\x0a"//,
-			"Sec-WebSocket-Key:  1VTFj/CydlBCZDucDqw8eA==\x0d\x0a"//,
-			"Sec-WebSocket-Version: 13\x0d\x0a"//,
-			"\x0d\x0a"};
+      // "GET / HTTP/1.1\x0d\x0a"//, //"GET {0} HTTP/1.1",
+			// "Upgrade: websocket\x0d\x0a"//,
+			// "Connection: Upgrade\x0d\x0a"//,
+			// "Host: {0}:{1}\x0d\x0a"//,//"Host: {0}",
+      // "Pragma: no-cache\x0d\x0a"
+      // "Cache-Control: no-cache\x0d\x0a"
+			// "Origin: SparkWebSocketClient\x0d\x0a"//,
+			// "Sec-WebSocket-Key:  1VTFj/CydlBCZDucDqw8eA==\x0d\x0a"//,
+			// "Sec-WebSocket-Version: 13\x0d\x0a"//,
+			// "\x0d\x0a"};
+
+			"GET / HTTP/1.1\x0d\x0a"//,                                  // Websocket requires HTTP 1.1
+      "Connection: Upgrade\x0d\x0a"//,                             // upgrade connection
+			"Upgrade: websocket\x0d\x0a"//,                              // to websocket
+			"Host: {0}:{1}\x0d\x0a"//,                                   // host:port information
+			"Origin: SparkWebSocketClient\x0d\x0a"//,                    // TODO #7 ID origin
+      "Sec-WebSocket-Version: 13\x0d\x0a"//,                       // websocket version
+			"Sec-WebSocket-Key:  1VTFj/CydlBCZDucDqw8eA==\x0d\x0a"//,    // TODO #2 base64 hash
+			"\x0d\x0a"};                                                 // requires a terminating CRLF
 
   const char* _hostname;
   const byte* _host;
@@ -101,10 +113,11 @@ String SBSWebSocketClientStringTable = {
   const char* _protocol;
   bool _canConnect;
   bool _reconnecting;
+  bool _sendingConfig;
   unsigned long _retryTimeout;
   void reconnect();
   void sendHandshake(const char* hostname, const char* path, const char* protocol);
-  TCPClient _client;
+  TCPClient _tcpclient;
   OnOpen _onOpen;
   OnClose _onClose;
   OnMessage _onMessage;
@@ -112,8 +125,10 @@ String SBSWebSocketClientStringTable = {
   char* _packet;
   unsigned int _packetLength;
   byte _opCode;
+  SBHead dataType;
   bool readHandshake();
   void readLine(char* buffer);
+  bool verifyData(SBHead type, char* p);
   void generateHash(char* buffer, size_t bufferlen);
   size_t base64Encode(byte* src, size_t srclength, char* target, size_t targetsize);
   byte nextByte();
